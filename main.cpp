@@ -1,129 +1,91 @@
 #include <iostream>
-#include <vector>
-#include <string>
-#include <cstring>
 
-// 1. how does a vector grow
-// 2. each allocation of vector is a malloc(heap) allocation, so we can count how many times the vector grows by counting the number of malloc calls
-// 3. reserve
-// 3.5. remove reserve
-// 4. printVector - pass by value, so it will create a copy of the vector, which will call the copy constructor of Player for each element in the vector, and then call the destructor for each element in the vector when the function ends
-// 5. add reserve 
-// 6. still some allocations!
-// 7. add const &
-// 8. Emplace_back - construct the object in place, so it will call the constructor of Player directly, without creating a temporary object, which will avoid the copy constructor and move constructor calls, and also avoid the destructor calls for the temporary objects
-// 9. Hurra bara en! Men det behövs inte heller - use std::array
-// 10. Copy and move constructors - when we push back a player into the vector, it will call the copy constructor of Player to create a copy of the player object, and then call the destructor for the temporary player object that was created during the push back operation. If we use emplace_back instead of push_back, it will call the constructor of Player directly, without creating a temporary object, which will avoid the copy constructor and move constructor calls, and also avoid the destructor calls for the temporary objects.
 
-int allocationCount = 0;
-void *operator new(std::size_t size) {
-    ++allocationCount;
-    return malloc(size);
-}
+// 1. By default COPY (copy by value) is SHALLOW
+// which is just copy the things  on the stack
 
-int descructorCount = 0;
-int constructorCount = 0;
-int copyConstructorCount = 0;
-int moveConstructorCount = 0;
+//2. Move semantics - when we move an object, we transfer ownership of the resources from one object to another, which can be more efficient than copying, especially for objects that manage resources like dynamic memory, file handles, etc. The move constructor and move assignment operator are used to implement move semantics in C++. When an object is moved, the resources are transferred to the new object, and the old object is left in a valid but unspecified state. This can help avoid unnecessary copying and improve performance in certain situations.
 
-struct Player {
-    int jerseyNumber;
+class ShallowBuffer {
+public:
+    int* data;
 
-    std::string name;
-
-    Player(int number, const std::string& playerName) : jerseyNumber(number), name(playerName) {
-        ++constructorCount;
-    }
-    // //copy constructor
-    Player(const Player& other) : jerseyNumber(other.jerseyNumber), name(other.name) {
-        ++copyConstructorCount;
-    }
-    // move constructor
-    Player(Player&& other) noexcept : jerseyNumber(other.jerseyNumber), name(std::move(other.name)) {
-        ++moveConstructorCount;
+    ShallowBuffer() {
+        data = new int[10]; // Allocate memory on the heap
+        std::cout << "Memory allocated at: " << data << "\n";
     }
 
-
-    virtual ~Player() {
-        ++descructorCount;
+    ~ShallowBuffer() {
+        std::cout << "Attempting to free memory at: " << data << "\n";
+        delete[] data; 
+        std::cout << "Memory successfully freed!\n";
     }
 };
 
-
-void printVector(const std::vector<Player> &players) {
-    for (const Player &player : players) {
-        std::cout << "Player: " << player.name << ", Jersey Number: " << player.jerseyNumber << std::endl;
-    }
-}
-
-// int test(int a){ // COPY BY VALUE
-//     a = 12;
-//     return 0;
-// }
-
-void runIt(){
-    // int b = 13;
-    // test(b);
-    //std::cout << "Value of b after test: " << b << std::endl; // will print 13, because the value of b is not changed in the test function, since it is passed by value, which means that a copy of b is created in the test function, and the changes made to a do not affect b
-
-    std::vector<Player> players; 
-    //players.reserve(100); // reserve space for 100 players to avoid multiple allocations as we push back players
-
- // DURING EXECUTION 527 PLAYERS ARE BEING CREATED
-    for(int i = 0; i < 100; ++i) {
-        // test(i);
-        // test(140+1);
-        
-        // iN THIS EXAMPLE we will be able to use a MOVE constructor
-        //players.push_back(Player(i + 1, "Player" + std::to_string(i + 1))); // Copnstructor will be called
-        players.emplace_back(i + 1, "Player" + std::to_string(i + 1)); // construct the player object in place, which will avoid the copy constructor and move constructor calls, and also avoid the destructor calls for the temporary objects
-
-
-        // Player p = Player(i + 1, "Player" + std::to_string(i + 1)); // Contructior is called
-        // players.push_back(p); // copy constructor is called to create a copy of p in the vector, and then the destructor is called for the temporary player object that was created during the push back operation
-        // lvalue and rvalue references - if we use push_back with a temporary object, it will call the move constructor of Player to create a new player object in the vector, and then call the destructor for the temporary player object that was created during the push back operation. If we use emplace_back instead of push_back, it will call the constructor of Player directly, without creating a temporary object, which will avoid the copy constructor and move constructor calls, and also avoid the destructor calls for the temporary objects
-        
-        //players.emplace_back(i + 1, "Player" + std::to_string(i + 1)); // construct the player object in place, which will avoid the copy constructor and move constructor calls, and also avoid the destructor calls for the temporary objects
-    }
+void triggerBug() {
+    ShallowBuffer obj1; // Constructor runs
     
-    printVector(players);
-}
-
-
-class String{
-public: 
-    String(const char *s) {
-        data = new char[std::strlen(s) + 1];
-        std::strcpy(data, s);
-        std::cout << "Constructor called for: " << s << std::endl;
-    }
-
-    ~String() {
-        delete [] data;
-        std::cout << "Destructor called" << std::endl;
-    }
-private:
-    char* data;
-    int size;    
-};
-
+    // The "Bug" happens here:
+    // Default copy constructor copies the ADDRESS of obj1.data into obj2.data.
+    ShallowBuffer obj2 = obj1; 
+    
+    std::cout << "obj1.data: " << obj1.data << "\n";
+    std::cout << "obj2.data: " << obj2.data << "\n";
+} // End of scope: obj2 and obj1 are destroyed here
 
 int main() {
-
-    String s1("Hello");
-
-    String s3(s1); 
-    String s4(String("Hello")); 
-    String s2 = s1;
-
-    
-    runIt();
-
-    std::cout << "Total malloc(heap) allocations - thats vector growing: " << allocationCount << std::endl;
-    std::cout << "Total player destructors called: " << descructorCount << std::endl;
-    std::cout << "Total player constructors called: " << constructorCount << std::endl;
-    std::cout << "Total player copy constructors called: " << copyConstructorCount << std::endl;
-    std::cout << "Total player move constructors called: " << moveConstructorCount << std::endl;
-
+    std::cout << "Starting main function.\n";
+    triggerBug();
+    std::cout << "Exiting main function.\n";
     return 0;
 }
+
+
+// Fixing med COPY CONSTRUCTIOR
+// ShallowBuffer(const ShallowBuffer& other) {
+//     data = new int[10]; // Request NEW memory
+//     for(int i=0; i<10; ++i) {
+//         data[i] = other.data[i]; // Copy the actual values
+//     }
+//     std::cout << "Deep copy created at: " << data << "\n";
+// }
+
+
+
+// 2 Move
+//Instead of making a costly copy of the data, the new object simply plucks the pointer out of the temporary object
+// Deep Copy builds an exact replica of that house on a new plot of land. Move Semantics just hands them the keys to the existing house and changes the address on the mailbox.
+
+// When we "move" an object, we use an rvalue reference (&&). This tells the compiler: "This source object is temporary; feel free to gut it for part
+// #include <iostream>
+
+// class MoveBuffer {
+// public:
+//     int* data;
+
+//     MoveBuffer() : data(new int[10]) {
+//         std::cout << "Allocated memory at: " << data << "\n";
+//     }
+
+//     // --- MOVE CONSTRUCTOR ---
+//     MoveBuffer(MoveBuffer&& other) noexcept 
+//         : data(other.data) { // 1. Take the pointer
+        
+//         other.data = nullptr; // 2. "Null out" the old pointer (CRITICAL)
+//         std::cout << "Moved memory from old object to new one.\n";
+//     }
+
+//     ~MoveBuffer() {
+//         if (data != nullptr) {
+//             std::cout << "Freeing memory at: " << data << "\n";
+//             delete[] data;
+//         } else {
+//             std::cout << "Nothing to free (pointer is null).\n";
+//         }
+//     }
+// };
+
+// WHEN IS MOVE CONSTRUCTOR CALLED?
+// 1. When an object is initialized with a temporary (rvalue) object.
+// 2. When std::move is used to explicitly indicate that an object can be "moved from".
+// 3. When returning a local object from a function (NRVO - Named Return Value Optimization can sometimes elide this).
