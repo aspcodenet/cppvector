@@ -75,7 +75,8 @@ void runIt(){
         // test(140+1);
         
         // iN THIS EXAMPLE we will be able to use a MOVE constructor
-        //players.push_back(Player(i + 1, "Player" + std::to_string(i + 1))); // Copnstructor will be called
+        
+        players.push_back(Player(i + 1, "Player" + std::to_string(i + 1))); // Copnstructor will be called
         players.emplace_back(i + 1, "Player" + std::to_string(i + 1)); // construct the player object in place, which will avoid the copy constructor and move constructor calls, and also avoid the destructor calls for the temporary objects
 
 
