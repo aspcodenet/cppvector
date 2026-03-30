@@ -1,6 +1,6 @@
 PROG = main.exe 
 SRC = main.cpp
-CFLAGS = -g -std=c++17
+CFLAGS = -g -std=c++20
 LIBS = 
 CC=g++
 
